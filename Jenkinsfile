@@ -1,57 +1,57 @@
 pipeline {
   agent any
+
   environment {
     DOCKERHUB_REPO = "zubairalamdev/myapp"
     INFRA_REPO = "https://github.com/zubairalamdev-alam/infra.git"
     INFRA_BRANCH = "main"
   }
+
   stages {
     stage('Checkout') {
       steps {
         checkout scm
-        script { 
-          GIT_COMMIT_SHORT = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim() 
+        script {
+          GIT_COMMIT_SHORT = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
         }
       }
     }
-    stage('Build') {
+
+    stage('Build Docker Image') {
       steps {
-        sh 'npm ci'
-        sh 'npm test || true' // safe fallback if no tests
-      }
-    }
-    stage('Docker Build & Push') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', 
-                                          usernameVariable: 'DOCKER_USER', 
-                                          passwordVariable: 'DOCKER_PASS')]) {
-          sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-          sh "docker build -t ${DOCKERHUB_REPO}:${GIT_COMMIT_SHORT} ."
-          sh "docker push ${DOCKERHUB_REPO}:${GIT_COMMIT_SHORT}"
-        }
-      }
-    }
-    stage('Update Infra (deploy manifest)') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'infra-git-creds', 
-                                          usernameVariable: 'GIT_USER', 
-                                          passwordVariable: 'GIT_TOKEN')]) {
+        script {
           sh """
-            git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/zubairalamdev-alam/infra.git 
-infra
-            cd infra/k8s
-            sed -i 's|image: .*|image: ${DOCKERHUB_REPO}:${GIT_COMMIT_SHORT}|' deployment.yaml
-            git add deployment.yaml
-            git commit -m "ci: bump image to ${GIT_COMMIT_SHORT}" || true
-            git push origin ${INFRA_BRANCH}
+            docker build -t ${DOCKERHUB_REPO}:${GIT_COMMIT_SHORT} .
+            docker push ${DOCKERHUB_REPO}:${GIT_COMMIT_SHORT}
           """
         }
       }
     }
-  }
-  post {
-    always {
-      sh 'docker logout'
+
+    stage('Update Infra Repo') {
+      steps {
+        withCredentials([string(credentialsId: 'git-token', variable: 'GIT_TOKEN')]) {
+          sh '''
+            # remove if old
+            rm -rf infra
+
+            # clone with token
+            git clone https://zubairalamdev:${GIT_TOKEN}@github.com/zubairalamdev-alam/infra.git
+            cd infra
+            git checkout ${INFRA_BRANCH}
+
+            # update YAML (example: deployment.yaml)
+            sed -i "s|image: ${DOCKERHUB_REPO}:.*|image: ${DOCKERHUB_REPO}:${GIT_COMMIT_SHORT}|" 
+k8s/deployment.yaml
+
+            git config user.email "ci-bot@codiantech.com"
+            git config user.name "Jenkins CI"
+            git add k8s/deployment.yaml
+            git commit -m "Update image to ${DOCKERHUB_REPO}:${GIT_COMMIT_SHORT}"
+            git push origin ${INFRA_BRANCH}
+          '''
+        }
+      }
     }
   }
 }
