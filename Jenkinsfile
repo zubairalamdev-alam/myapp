@@ -30,7 +30,7 @@ pipeline {
             }
         }
 
-        stage('Update Infra Repo') {
+       stage('Update Infra Repo') {
     steps {
         withCredentials([string(credentialsId: 'GIT_TOKEN', variable: 'GIT_TOKEN')]) {
             sh """
@@ -39,13 +39,15 @@ pipeline {
                 cd infra
                 git checkout main
 
+                # Update image tag in deployment file
                 sed -i "s|image: zubairalamdev/myapp:.*|image: zubairalamdev/myapp:${GIT_COMMIT_SHORT}|" k8s/deployment.yaml
 
+                # Commit & push
                 git config user.email "ci@jenkins"
                 git config user.name "Jenkins CI"
                 git add k8s/deployment.yaml
-                git commit -m "Update image tag to ${GIT_COMMIT_SHORT}"
-                git push origin main
+                git commit -m "Update image tag to ${GIT_COMMIT_SHORT}" || echo "No changes to commit"
+                git push origin main || echo "No changes to push"
             """
         }
     }
