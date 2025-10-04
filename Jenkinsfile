@@ -40,7 +40,9 @@ pipeline {
                       git checkout main
 
                       # ✅ Update deployment.yaml
-                      sed -i "s|image: zubairalamdev/myapp:.*|image: zubairalamdev/myapp:${GIT_COMMIT_SHORT}|" infra/k8s/deployment.yaml
+                      #sed -i "s|image: zubairalamdev/myapp:.*|image: zubairalamdev/myapp:${GIT_COMMIT_SHORT}|" infra/k8s/deployment.yaml
+                      sed -i s|image: zubairalamdev/myapp:.*|image: zubairalamdev/myapp:${GIT_COMMIT_SHORT}| k8s/deployment.yaml
+
 
                       git config user.name "Jenkins"
                       git config user.email "jenkins@ci"
