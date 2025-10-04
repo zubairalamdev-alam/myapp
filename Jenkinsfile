@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKER_USER = 'zubairalamdev'
         DOCKER_PASS = credentials('docker-pass')
-        GIT_TOKEN   = credentials('git-token')
+        GIT_TOKEN   = credentials('GIT_TOKEN')
     }
 
     stages {
